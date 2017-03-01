@@ -27,7 +27,7 @@ public class UsbConnector {
 
     private static final int MSG_NO_DEVICE_FOUND = 0;
     private static final int MSG_DEVICE_ATTACHED = 1;
-    private static final int MSG_DEVICE_DETTACHED = 2;
+    private static final int MSG_DEVICE_DETACHED = 2;
     private static final int MSG_PERMISSION_GRANTED = 3;
     private static final int MSG_PERMISSION_DENIED = 4;
 
@@ -115,6 +115,10 @@ public class UsbConnector {
         }
     }
 
+    public UsbDeviceConnection getConnection() {
+        return mUsbDeviceConnection;
+    }
+
     private void closeCommunication() {
         if (mUsbDeviceConnection != null) {
             if (mUsbInterface != null)
@@ -153,7 +157,7 @@ public class UsbConnector {
 
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                 disconnect();
-                mUsbConnectionListener.onReceiveMessage(MSG_DEVICE_DETTACHED);
+                mUsbConnectionListener.onReceiveMessage(MSG_DEVICE_DETACHED);
             } else if (ACTION_USB_PERMISSION.equals(action)) {
                 // This condition is satisfied only when a result is returned by the dialog asking user for the
                 // permission, after you called requestPermission()/askForPermission.
