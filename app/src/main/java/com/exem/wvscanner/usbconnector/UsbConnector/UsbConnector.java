@@ -6,6 +6,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbEndpoint;
+import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 
 import java.util.HashMap;
@@ -28,11 +31,17 @@ public class UsbConnector {
     private static final int MSG_PERMISSION_GRANTED = 3;
     private static final int MSG_PERMISSION_DENIED = 4;
 
+    private boolean forceClaim = true;
+
     private Context mContext;
     private UsbConnectionListener mUsbConnectionListener;
     private UsbManager mUsbManager;
-    private UsbDevice mUsbDevice;
+    private UsbDevice mUsbDeviceGranted;
     private UsbBroadCastReceiver mUsbBroadCastReceiver;
+
+    private UsbInterface mUsbInterface;
+    private UsbEndpoint mUsbEndPoint;
+    private UsbDeviceConnection mUsbDeviceConnection;
 
     public UsbConnector(Context context) {
         this(context, null);
@@ -44,14 +53,13 @@ public class UsbConnector {
         setUsbConnectionListener(listener);
 
         mUsbManager = (UsbManager) mContext.getSystemService(Context.USB_SERVICE);
-        mUsbBroadCastReceiver = new UsbBroadCastReceiver();
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_USB_PERMISSION);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        mUsbBroadCastReceiver = new UsbBroadCastReceiver();
         mContext.registerReceiver(mUsbBroadCastReceiver, filter);
-
     }
 
     public void setUsbConnectionListener(UsbConnectionListener listener) {
@@ -69,7 +77,7 @@ public class UsbConnector {
     }
 
     public void connect() {
-        if (mUsbDevice != null) return; // there is already a device connected.
+        if (mUsbDeviceGranted != null) return; // there is already a device connected.
 
         HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
         Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
@@ -90,14 +98,43 @@ public class UsbConnector {
         }
     }
 
-    public void askForPermission(UsbDevice device) {
+    private void askForPermission(UsbDevice device) {
         if (device == null) return;
         PendingIntent pendingIntent = PendingIntent.getBroadcast(mContext, 0, new Intent(ACTION_USB_PERMISSION), 0);
         mUsbManager.requestPermission(device, pendingIntent);
     }
 
-    public void disconnect() {
+    private void openCommunication() {
+        if (mUsbDeviceGranted != null) {
+            //
+            mUsbInterface = mUsbDeviceGranted.getInterface(0);
+            mUsbEndPoint = mUsbInterface.getEndpoint(0);
+            mUsbDeviceConnection = mUsbManager.openDevice(mUsbDeviceGranted);
+            mUsbDeviceConnection.claimInterface(mUsbInterface, forceClaim);
+        }
+    }
 
+    private void closeCommunication() {
+        if (mUsbDeviceConnection != null) {
+            if (mUsbInterface != null)
+                mUsbDeviceConnection.releaseInterface(mUsbInterface);
+            mUsbDeviceConnection.close();
+        }
+        mUsbInterface = null;
+        mUsbEndPoint = null;
+        mUsbDeviceConnection = null;
+    }
+
+    public void disconnect() {
+        closeCommunication();
+        mUsbDeviceGranted = null;
+    }
+
+    public void destroy() {
+        disconnect();
+        mContext.unregisterReceiver(mUsbBroadCastReceiver);
+        mContext = null;
+        mUsbManager = null;
     }
 
     private class UsbBroadCastReceiver extends BroadcastReceiver {
@@ -122,9 +159,10 @@ public class UsbConnector {
                 synchronized (this) {
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                         if (device != null) {
-                            // mUsbDevice is set only at here to make sure every instance of mUsbDevice is
+                            // mUsbDeviceGranted is set only at here to make sure every instance of mUsbDeviceGranted is
                             // permission-granted.
-                            mUsbDevice = device;
+                            mUsbDeviceGranted = device;
+                            openCommunication(); // setup of interface and endpoint communication
                             mUsbConnectionListener.onReceiveMessage(MSG_PERMISSION_GRANTED);
                         } else
                             connect(); // retry
