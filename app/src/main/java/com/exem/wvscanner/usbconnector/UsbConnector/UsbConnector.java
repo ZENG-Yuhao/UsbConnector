@@ -1,10 +1,15 @@
 package com.exem.wvscanner.usbconnector.UsbConnector;
 
+import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbManager;
+
+import java.util.HashMap;
+import java.util.Iterator;
 
 
 /**
@@ -17,49 +22,114 @@ import android.hardware.usb.UsbManager;
 public class UsbConnector {
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 
+    private static final int MSG_NO_DEVICE_FOUND = 0;
+    private static final int MSG_DEVICE_ATTACHED = 1;
+    private static final int MSG_DEVICE_DETTACHED = 2;
+    private static final int MSG_PERMISSION_GRANTED = 3;
+    private static final int MSG_PERMISSION_DENIED = 4;
+
+    private Context mContext;
     private UsbConnectionListener mUsbConnectionListener;
+    private UsbManager mUsbManager;
+    private UsbDevice mUsbDevice;
+    private UsbBroadCastReceiver mUsbBroadCastReceiver;
 
     public UsbConnector(Context context) {
         this(context, null);
     }
 
     public UsbConnector(Context context, UsbConnectionListener listener) {
+        if (context == null) throw new IllegalArgumentException("Context null.");
+        mContext = context;
         setUsbConnectionListener(listener);
+
+        mUsbManager = (UsbManager) mContext.getSystemService(Context.USB_SERVICE);
+        mUsbBroadCastReceiver = new UsbBroadCastReceiver();
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_USB_PERMISSION);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        mContext.registerReceiver(mUsbBroadCastReceiver, filter);
 
     }
 
     public void setUsbConnectionListener(UsbConnectionListener listener) {
         if (listener != null) {
             mUsbConnectionListener = listener;
+        } else {
+            // add a empty listener in case NULL pointer check is required each time we call this listener;
+            mUsbConnectionListener = new UsbConnectionListener() {
+                @Override
+                public void onReceiveMessage(int msg) {
+                    // do nothing
+                }
+            };
         }
     }
 
     public void connect() {
+        if (mUsbDevice != null) return; // there is already a device connected.
+
+        HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
+        Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
+        UsbDevice device = null;
+        // In this case, pad has only one usb port and we assumed that the connected device is just right the one we
+        // need.
+        // For more general cases, you should add more conditions/filters (such like vendorId, deviceName etc.) to
+        // check whether the device found is correct.
+        while (deviceIterator.hasNext()) {
+            device = deviceIterator.next();
+            if (device != null) break;
+        }
+
+        if (device == null)
+            mUsbConnectionListener.onReceiveMessage(MSG_NO_DEVICE_FOUND);
+        else {
+            askForPermission(device);
+        }
+    }
+
+    public void askForPermission(UsbDevice device) {
+        if (device == null) return;
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(mContext, 0, new Intent(ACTION_USB_PERMISSION), 0);
+        mUsbManager.requestPermission(device, pendingIntent);
+    }
+
+    public void disconnect() {
 
     }
 
-    private class UsbBroadCastReciever extends BroadcastReceiver {
+    private class UsbBroadCastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
 
             if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
-                // todo
+                mUsbConnectionListener.onReceiveMessage(MSG_DEVICE_ATTACHED);
+                if (device != null)
+                    askForPermission(device);
+                else
+                    connect(); // try to find a new available device.
+
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
-                // todo
+                disconnect();
+                mUsbConnectionListener.onReceiveMessage(MSG_DEVICE_DETTACHED);
             } else if (ACTION_USB_PERMISSION.equals(action)) {
-                // This condition is satisfied when a result is returned by the dialog asking user for the
-                // permission, after you called requestPermission().
+                // This condition is satisfied only when a result is returned by the dialog asking user for the
+                // permission, after you called requestPermission()/askForPermission.
                 synchronized (this) {
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                         if (device != null) {
-                            //call method to set up device communication
-                            // todo
-                        }
+                            // mUsbDevice is set only at here to make sure every instance of mUsbDevice is
+                            // permission-granted.
+                            mUsbDevice = device;
+                            mUsbConnectionListener.onReceiveMessage(MSG_PERMISSION_GRANTED);
+                        } else
+                            connect(); // retry
                     } else {
-                        //Log.d(TAG, "permission denied for device " + device);
-                        // todo
+                        mUsbConnectionListener.onReceiveMessage(MSG_PERMISSION_DENIED);
                     }
                 }
             }
@@ -67,5 +137,6 @@ public class UsbConnector {
     }
 
     public interface UsbConnectionListener {
+        void onReceiveMessage(int msg);
     }
 }
