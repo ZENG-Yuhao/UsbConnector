@@ -84,7 +84,7 @@ public class UsbConnector {
         if (listener != null) {
             mUsbConnectionListener = listener;
         } else {
-            // add a empty listener in "if (listener != null)" is required each time we call this listener;
+            // add a empty listener in case "if (listener != null)" is required each time we call this listener;
             mUsbConnectionListener = new UsbConnectionListener() {
                 @Override
                 public void onReceiveMessage(int msg) {
