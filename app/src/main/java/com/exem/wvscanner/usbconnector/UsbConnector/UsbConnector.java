@@ -40,14 +40,14 @@ import java.util.Iterator;
  */
 
 public class UsbConnector {
-    private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
+    public static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 
     // message codes
-    private static final int MSG_NO_DEVICE_FOUND = 0;
-    private static final int MSG_DEVICE_ATTACHED = 1;
-    private static final int MSG_DEVICE_DETACHED = 2;
-    private static final int MSG_PERMISSION_GRANTED = 3;
-    private static final int MSG_PERMISSION_DENIED = 4;
+    public static final int MSG_NO_DEVICE_FOUND = 0;
+    public static final int MSG_DEVICE_ATTACHED = 1;
+    public static final int MSG_DEVICE_DETACHED = 2;
+    public static final int MSG_PERMISSION_GRANTED = 3;
+    public static final int MSG_PERMISSION_DENIED = 4;
 
     private boolean forceClaim = true;
 
