@@ -106,7 +106,8 @@ public class UsbConnector {
 
     private void openCommunication() {
         if (mUsbDeviceGranted != null) {
-            //
+            // Here is a particular use-case of interface and endpoint, perhaps you should have more logic to find
+            // the interface and endpoint correctly.
             mUsbInterface = mUsbDeviceGranted.getInterface(0);
             mUsbEndPoint = mUsbInterface.getEndpoint(0);
             mUsbDeviceConnection = mUsbManager.openDevice(mUsbDeviceGranted);
