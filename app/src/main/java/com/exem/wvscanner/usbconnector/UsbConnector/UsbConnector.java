@@ -115,8 +115,29 @@ public class UsbConnector {
         }
     }
 
-    public UsbDeviceConnection getConnection() {
-        return mUsbDeviceConnection;
+    /**
+     * This method provides the same function as
+     * {@link UsbDeviceConnection#controlTransfer(int, int, int, int, byte[], int, int)}, but it prevents instance of
+     * {@link UsbDeviceConnection} from being revealed to outside of this class.
+     * <p/>
+     * Tips: <br>
+     * You can use simply <b>0x40 (0b0100 0000)</b> as requestType for sending data and <b>0xC0 (0b1100 0000)</b> for
+     * receiving data. <br>
+     * <br>
+     * requestType: <br>
+     * Bit 7: Request direction (0=Host to device - Out, 1=Device to host - In). <br>
+     * Bits 5-6: Request type (0=standard, 1=class, 2=vendor, 3=reserved). <br>
+     * Bits 0-4: Recipient (0=device, 1=interface, 2=endpoint,3=other). <br>
+     *
+     * @return length of data
+     * @see <a herf="http://www.jungo.com/st/support/documentation/windriver/811/wdusb_man_mhtml/node55.html">
+     *     USB Control Transfers Overview </a>
+     */
+    public int controlTransfer(int requestType, int request, int value, int index, byte[] buffer, int length, int
+            timeout) {
+        if (mUsbDeviceConnection == null) return -1;
+        else
+            return mUsbDeviceConnection.controlTransfer(requestType, request, value, index, buffer, length, timeout);
     }
 
     private void closeCommunication() {
@@ -140,6 +161,14 @@ public class UsbConnector {
         mContext.unregisterReceiver(mUsbBroadCastReceiver);
         mContext = null;
         mUsbManager = null;
+    }
+
+    public boolean isDeviceConnected() {
+        return (mUsbDeviceGranted != null);
+    }
+
+    public boolean isCommunicationBuilt() {
+        return (mUsbDeviceConnection != null);
     }
 
     private class UsbBroadCastReceiver extends BroadcastReceiver {
