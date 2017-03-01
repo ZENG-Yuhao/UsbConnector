@@ -25,6 +25,7 @@ import java.util.Iterator;
 public class UsbConnector {
     private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
 
+    // message codes
     private static final int MSG_NO_DEVICE_FOUND = 0;
     private static final int MSG_DEVICE_ATTACHED = 1;
     private static final int MSG_DEVICE_DETACHED = 2;
@@ -76,6 +77,12 @@ public class UsbConnector {
         }
     }
 
+    /**
+     * This method enumerates all devices, if an available device is found, it will ask for a permission to user to
+     * access this device. <br>
+     * This method can be called manually or be called automatically by {@link UsbBroadCastReceiver} when Android
+     * detects a device that has been attached.
+     */
     public void connect() {
         if (mUsbDeviceGranted != null) return; // there is already a device connected.
 
@@ -131,7 +138,7 @@ public class UsbConnector {
      *
      * @return length of data
      * @see <a herf="http://www.jungo.com/st/support/documentation/windriver/811/wdusb_man_mhtml/node55.html">
-     *     USB Control Transfers Overview </a>
+     * USB Control Transfers Overview </a>
      */
     public int controlTransfer(int requestType, int request, int value, int index, byte[] buffer, int length, int
             timeout) {
@@ -156,6 +163,10 @@ public class UsbConnector {
         mUsbDeviceGranted = null;
     }
 
+    /**
+     * Call this method to release resources and unregister broadcast if this class finished its works. Otherwise,
+     * there may be some issues.
+     */
     public void destroy() {
         disconnect();
         mContext.unregisterReceiver(mUsbBroadCastReceiver);
@@ -171,6 +182,10 @@ public class UsbConnector {
         return (mUsbDeviceConnection != null);
     }
 
+    /**
+     * Custom BroadCastReceiver that listens events: device-attached, device-detached and request of
+     * permission.
+     */
     private class UsbBroadCastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
