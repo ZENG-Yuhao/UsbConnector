@@ -16,6 +16,23 @@ import java.util.Iterator;
 
 
 /**
+ * This class helps you in: <br>
+ * <ul  style="list-style-type:none">
+ * <li> 1) Listening usb device's attach/detach events. </li>
+ * <li> 2) Finding attached usb devices. </li>
+ * <li> 3) Requesting permission for usb device found. </li>
+ * <li> 4) Building connection and communication with the usb device. </li>
+ * <li> 5) Handling disconnection and recycling of resources. </li>
+ * </ul>
+ * Usage classic: <br>
+ * <ul  style="list-style-type:none">
+ * <li> 1) Create new instance of class </li>
+ * <li> 2) Bind a {@link UsbConnectionListener} </li>
+ * <li> 3) Call {@link #connect()} to check whether there are devices being attached before this class is
+ * launched.</li>
+ * <li> 4) Call {@link #controlTransfer(int, int, int, int, byte[], int, int)} to communicate with the device. </li>
+ * <li> 5) Call {@link #destroy()} to release resources if this class is needed no more. </li>
+ * <br>
  * <p>
  * Created by ZENG Yuhao. <br>
  * Contact: enzo.zyh@gmail.com
