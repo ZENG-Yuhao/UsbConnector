@@ -1,4 +1,4 @@
-package com.exem.wvscanner.usbconnector;
+package com.zeng.example.usbconnector;
 
 import android.content.Context;
 import android.support.test.InstrumentationRegistry;

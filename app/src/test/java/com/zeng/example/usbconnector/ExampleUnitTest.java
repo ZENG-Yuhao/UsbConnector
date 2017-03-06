@@ -1,4 +1,4 @@
-package com.exem.wvscanner.usbconnector;
+package com.zeng.example.usbconnector;
 
 import org.junit.Test;
 

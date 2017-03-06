@@ -1,4 +1,4 @@
-package com.exem.wvscanner.usbconnector.UsbConnector;
+package com.zeng.example.usbconnector.UsbConnector;
 
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -11,7 +11,6 @@ import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;

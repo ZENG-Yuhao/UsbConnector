@@ -1,9 +1,7 @@
-package com.exem.wvscanner.usbconnector;
+package com.zeng.example.usbconnector;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-
-import com.exem.wvscanner.usbconnector.UsbConnector.UsbConnector;
 
 public class MainActivity extends AppCompatActivity {
 
