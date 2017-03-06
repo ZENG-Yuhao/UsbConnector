@@ -11,6 +11,7 @@ import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -107,25 +108,25 @@ public class UsbConnector {
             mDeviceAdapter = adapter;
     }
 
-    public void scan() {
+    public ArrayList<UsbDevice> scan() {
         // clear old list
         mIdentifiedDevices = new ArrayList<>();
 
         HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
         if (deviceList.size() == 0) {
             mConnectionListener.onReceiveMessage(MSG_NO_DEVICE_FOUND);
-            return;
-        }
+        } else {
+            Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
+            while (deviceIterator.hasNext()) {
+                UsbDevice device = deviceIterator.next();
+                if (mDeviceAdapter.identifyDevice(device))
+                    mIdentifiedDevices.add(device);
+            }
 
-        Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
-        while (deviceIterator.hasNext()) {
-            UsbDevice device = deviceIterator.next();
-            if (mDeviceAdapter.identifyDevice(device))
-                mIdentifiedDevices.add(device);
+            if (mIdentifiedDevices.size() == 0)
+                mConnectionListener.onReceiveMessage(MSG_NO_MATCHED_DEVICE);
         }
-
-        if (mIdentifiedDevices.size() == 0)
-            mConnectionListener.onReceiveMessage(MSG_NO_MATCHED_DEVICE);
+        return mIdentifiedDevices;
     }
 
     public void connect() {
@@ -134,34 +135,6 @@ public class UsbConnector {
         UsbDevice selectedDevice = mDeviceAdapter.selectDevice(mIdentifiedDevices);
         if (selectedDevice != null)
             askForPermission(selectedDevice);
-    }
-
-    /**
-     * This method enumerates all devices, if an available device is found, it will ask for a permission to user to
-     * access this device. <br>
-     * This method can be called manually or be called automatically by {@link UsbBroadCastReceiver} when Android
-     * detects a device that has been attached.
-     */
-    public void connect_old() {
-        if (mGrantedDevice != null) return; // there is already a device connected.
-
-        HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
-        Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
-        UsbDevice device = null;
-        // In this case, pad has only one usb port and we assumed that the connected device is just right the one we
-        // need.
-        // For more general cases, you should add more conditions/filters (such like vendorId, deviceName etc.) to
-        // check whether the device found is correct.
-        while (deviceIterator.hasNext()) {
-            device = deviceIterator.next();
-            if (device != null) break;
-        }
-
-        if (device == null)
-            mConnectionListener.onReceiveMessage(MSG_NO_DEVICE_FOUND);
-        else {
-            askForPermission(device);
-        }
     }
 
     private void askForPermission(UsbDevice device) {
@@ -265,6 +238,7 @@ public class UsbConnector {
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                 if (device != null && device == mGrantedDevice)
                     disconnect();
+                scan(); // update list
                 mConnectionListener.onReceiveMessage(MSG_DEVICE_DETACHED);
             } else if (ACTION_USB_PERMISSION.equals(action)) {
                 // This condition is satisfied only when a result is returned by the dialog asking user for the
@@ -277,8 +251,7 @@ public class UsbConnector {
                             mGrantedDevice = device;
                             openCommunication(); // setup of interface and endpoint communication
                             mConnectionListener.onReceiveMessage(MSG_PERMISSION_GRANTED);
-                        } else
-                            connect_old(); // retry
+                        }
                     } else {
                         mConnectionListener.onReceiveMessage(MSG_PERMISSION_DENIED);
                     }
