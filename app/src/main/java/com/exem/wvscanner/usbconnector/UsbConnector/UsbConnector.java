@@ -26,15 +26,6 @@ import java.util.Iterator;
  * <li> 4) Building connection and communication with the usb device. </li>
  * <li> 5) Handling disconnection and recycling of resources. </li>
  * </ul>
- * Usage classic: <br>
- * <ul  style="list-style-type:none">
- * <li> 1) Create new instance of class </li>
- * <li> 2) Bind a {@link ConnectionListener} </li>
- * <li> 3) Call {@link #connect_old()} to check whether there are devices being attached before this class is
- * launched.</li>
- * <li> 4) Call {@link #controlTransfer(int, int, int, int, byte[], int, int)} to communicate with the device. </li>
- * <li> 5) Call {@link #destroy()} to release resources if this class is needed no more. </li>
- * <br>
  * <p>
  * Created by ZENG Yuhao. <br>
  * Contact: enzo.zyh@gmail.com
@@ -108,10 +99,13 @@ public class UsbConnector {
             mDeviceAdapter = adapter;
     }
 
+    public ArrayList<UsbDevice> getIdentifiedDevices() {
+        return mIdentifiedDevices;
+    }
+
     public ArrayList<UsbDevice> scan() {
         // clear old list
         mIdentifiedDevices = new ArrayList<>();
-
         HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
         if (deviceList.size() == 0) {
             mConnectionListener.onReceiveMessage(MSG_NO_DEVICE_FOUND);
@@ -122,7 +116,6 @@ public class UsbConnector {
                 if (mDeviceAdapter.identifyDevice(device))
                     mIdentifiedDevices.add(device);
             }
-
             if (mIdentifiedDevices.size() == 0)
                 mConnectionListener.onReceiveMessage(MSG_NO_MATCHED_DEVICE);
         }
@@ -252,9 +245,8 @@ public class UsbConnector {
                             openCommunication(); // setup of interface and endpoint communication
                             mConnectionListener.onReceiveMessage(MSG_PERMISSION_GRANTED);
                         }
-                    } else {
+                    } else
                         mConnectionListener.onReceiveMessage(MSG_PERMISSION_DENIED);
-                    }
                 }
             }
         }
