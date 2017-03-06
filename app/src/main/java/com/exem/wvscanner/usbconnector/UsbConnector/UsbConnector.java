@@ -11,6 +11,7 @@ import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbManager;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -27,8 +28,8 @@ import java.util.Iterator;
  * Usage classic: <br>
  * <ul  style="list-style-type:none">
  * <li> 1) Create new instance of class </li>
- * <li> 2) Bind a {@link UsbConnectionListener} </li>
- * <li> 3) Call {@link #connect()} to check whether there are devices being attached before this class is
+ * <li> 2) Bind a {@link ConnectionListener} </li>
+ * <li> 3) Call {@link #connect_old()} to check whether there are devices being attached before this class is
  * launched.</li>
  * <li> 4) Call {@link #controlTransfer(int, int, int, int, byte[], int, int)} to communicate with the device. </li>
  * <li> 5) Call {@link #destroy()} to release resources if this class is needed no more. </li>
@@ -44,17 +45,23 @@ public class UsbConnector {
 
     // message codes
     public static final int MSG_NO_DEVICE_FOUND = 0;
+    public static final int MSG_NO_MATCHED_DEVICE = 5;
     public static final int MSG_DEVICE_ATTACHED = 1;
     public static final int MSG_DEVICE_DETACHED = 2;
     public static final int MSG_PERMISSION_GRANTED = 3;
     public static final int MSG_PERMISSION_DENIED = 4;
+    public static final int MSG_DEVICE_CONNECTED = 5;
+    public static final int MSG_DEVICE_DISCONNECTED = 6;
 
     private boolean forceClaim = true;
 
     private Context mContext;
-    private UsbConnectionListener mUsbConnectionListener;
+    private ConnectionListener mConnectionListener;
+    private DeviceAdapter mDeviceAdapter;
+    private ArrayList<UsbDevice> mIdentifiedDevices;
+
     private UsbManager mUsbManager;
-    private UsbDevice mUsbDeviceGranted;
+    private UsbDevice mGrantedDevice;
     private UsbBroadCastReceiver mUsbBroadCastReceiver;
 
     private UsbInterface mUsbInterface;
@@ -65,10 +72,11 @@ public class UsbConnector {
         this(context, null);
     }
 
-    public UsbConnector(Context context, UsbConnectionListener listener) {
+    public UsbConnector(Context context, ConnectionListener listener) {
         if (context == null) throw new IllegalArgumentException("Context null.");
         mContext = context;
         setUsbConnectionListener(listener);
+        setDeviceAdapter(new SimpleDeviceAdapter());
 
         mUsbManager = (UsbManager) mContext.getSystemService(Context.USB_SERVICE);
 
@@ -80,12 +88,12 @@ public class UsbConnector {
         mContext.registerReceiver(mUsbBroadCastReceiver, filter);
     }
 
-    public void setUsbConnectionListener(UsbConnectionListener listener) {
+    public void setUsbConnectionListener(ConnectionListener listener) {
         if (listener != null) {
-            mUsbConnectionListener = listener;
+            mConnectionListener = listener;
         } else {
             // add a empty listener in case "if (listener != null)" is required each time we call this listener;
-            mUsbConnectionListener = new UsbConnectionListener() {
+            mConnectionListener = new ConnectionListener() {
                 @Override
                 public void onReceiveMessage(int msg) {
                     // do nothing
@@ -94,14 +102,48 @@ public class UsbConnector {
         }
     }
 
+    public void setDeviceAdapter(DeviceAdapter adapter) {
+        if (adapter != null)
+            mDeviceAdapter = adapter;
+    }
+
+    public void scan() {
+        // clear old list
+        mIdentifiedDevices = new ArrayList<>();
+
+        HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
+        if (deviceList.size() == 0) {
+            mConnectionListener.onReceiveMessage(MSG_NO_DEVICE_FOUND);
+            return;
+        }
+
+        Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
+        while (deviceIterator.hasNext()) {
+            UsbDevice device = deviceIterator.next();
+            if (mDeviceAdapter.identifyDevice(device))
+                mIdentifiedDevices.add(device);
+        }
+
+        if (mIdentifiedDevices.size() == 0)
+            mConnectionListener.onReceiveMessage(MSG_NO_MATCHED_DEVICE);
+    }
+
+    public void connect() {
+        if (mIdentifiedDevices == null || mIdentifiedDevices.size() == 0)
+            return;
+        UsbDevice selectedDevice = mDeviceAdapter.selectDevice(mIdentifiedDevices);
+        if (selectedDevice != null)
+            askForPermission(selectedDevice);
+    }
+
     /**
      * This method enumerates all devices, if an available device is found, it will ask for a permission to user to
      * access this device. <br>
      * This method can be called manually or be called automatically by {@link UsbBroadCastReceiver} when Android
      * detects a device that has been attached.
      */
-    public void connect() {
-        if (mUsbDeviceGranted != null) return; // there is already a device connected.
+    public void connect_old() {
+        if (mGrantedDevice != null) return; // there is already a device connected.
 
         HashMap<String, UsbDevice> deviceList = mUsbManager.getDeviceList();
         Iterator<UsbDevice> deviceIterator = deviceList.values().iterator();
@@ -116,7 +158,7 @@ public class UsbConnector {
         }
 
         if (device == null)
-            mUsbConnectionListener.onReceiveMessage(MSG_NO_DEVICE_FOUND);
+            mConnectionListener.onReceiveMessage(MSG_NO_DEVICE_FOUND);
         else {
             askForPermission(device);
         }
@@ -129,13 +171,13 @@ public class UsbConnector {
     }
 
     private void openCommunication() {
-        if (mUsbDeviceGranted != null) {
-            // Here is a particular use-case of interface and endpoint, perhaps you should have more logic to find
-            // the interface and endpoint correctly.
-            mUsbInterface = mUsbDeviceGranted.getInterface(0);
-            mUsbEndPoint = mUsbInterface.getEndpoint(0);
-            mUsbDeviceConnection = mUsbManager.openDevice(mUsbDeviceGranted);
-            mUsbDeviceConnection.claimInterface(mUsbInterface, forceClaim);
+        if (mGrantedDevice != null) {
+            mUsbInterface = mDeviceAdapter.getInterface(mGrantedDevice);
+            mUsbEndPoint = mDeviceAdapter.getEndPoint(mUsbInterface);
+            mUsbDeviceConnection = mUsbManager.openDevice(mGrantedDevice);
+            boolean hasSucceeded = mUsbDeviceConnection.claimInterface(mUsbInterface, forceClaim);
+            if (hasSucceeded)
+                mConnectionListener.onReceiveMessage(MSG_DEVICE_CONNECTED);
         }
     }
 
@@ -164,6 +206,12 @@ public class UsbConnector {
             return mUsbDeviceConnection.controlTransfer(requestType, request, value, index, buffer, length, timeout);
     }
 
+    public int bulkTransfer(byte[] buffer, int length, int timeout) {
+        if (mUsbDeviceConnection == null) return -1;
+        else
+            return mUsbDeviceConnection.bulkTransfer(mUsbEndPoint, buffer, length, timeout);
+    }
+
     private void closeCommunication() {
         if (mUsbDeviceConnection != null) {
             if (mUsbInterface != null)
@@ -177,7 +225,8 @@ public class UsbConnector {
 
     public void disconnect() {
         closeCommunication();
-        mUsbDeviceGranted = null;
+        mGrantedDevice = null;
+        mConnectionListener.onReceiveMessage(MSG_DEVICE_DISCONNECTED);
     }
 
     /**
@@ -192,7 +241,7 @@ public class UsbConnector {
     }
 
     public boolean isDeviceConnected() {
-        return (mUsbDeviceGranted != null);
+        return (mGrantedDevice != null);
     }
 
     public boolean isCommunicationBuilt() {
@@ -210,37 +259,67 @@ public class UsbConnector {
             UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
 
             if (UsbManager.ACTION_USB_DEVICE_ATTACHED.equals(action)) {
-                mUsbConnectionListener.onReceiveMessage(MSG_DEVICE_ATTACHED);
-                if (device != null)
-                    askForPermission(device);
-                else
-                    connect(); // try to find a new available device.
-
+                mConnectionListener.onReceiveMessage(MSG_DEVICE_ATTACHED);
+                // when there is a device attached, scan all devices and update identified-device list.
+                scan();
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
-                disconnect();
-                mUsbConnectionListener.onReceiveMessage(MSG_DEVICE_DETACHED);
+                if (device != null && device == mGrantedDevice)
+                    disconnect();
+                mConnectionListener.onReceiveMessage(MSG_DEVICE_DETACHED);
             } else if (ACTION_USB_PERMISSION.equals(action)) {
                 // This condition is satisfied only when a result is returned by the dialog asking user for the
                 // permission, after you called requestPermission()/askForPermission.
                 synchronized (this) {
                     if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                         if (device != null) {
-                            // mUsbDeviceGranted is set only at here to make sure every instance of mUsbDeviceGranted is
+                            // mGrantedDevice is set only at here to make sure every instance of mGrantedDevice is
                             // permission-granted.
-                            mUsbDeviceGranted = device;
+                            mGrantedDevice = device;
                             openCommunication(); // setup of interface and endpoint communication
-                            mUsbConnectionListener.onReceiveMessage(MSG_PERMISSION_GRANTED);
+                            mConnectionListener.onReceiveMessage(MSG_PERMISSION_GRANTED);
                         } else
-                            connect(); // retry
+                            connect_old(); // retry
                     } else {
-                        mUsbConnectionListener.onReceiveMessage(MSG_PERMISSION_DENIED);
+                        mConnectionListener.onReceiveMessage(MSG_PERMISSION_DENIED);
                     }
                 }
             }
         }
     }
 
-    public interface UsbConnectionListener {
+    private class SimpleDeviceAdapter implements DeviceAdapter {
+        @Override
+        public boolean identifyDevice(UsbDevice device) {
+            return true;
+        }
+
+        @Override
+        public UsbDevice selectDevice(ArrayList<UsbDevice> identifiedDevices) {
+            return identifiedDevices.get(0);
+        }
+
+        @Override
+        public UsbInterface getInterface(UsbDevice selectedDevice) {
+            return selectedDevice.getInterface(0);
+        }
+
+        @Override
+        public UsbEndpoint getEndPoint(UsbInterface usbInterface) {
+            return usbInterface.getEndpoint(0);
+        }
+    }
+
+    public interface DeviceAdapter {
+        boolean identifyDevice(UsbDevice device);
+
+        UsbDevice selectDevice(ArrayList<UsbDevice> identifiedDevices);
+
+        UsbInterface getInterface(UsbDevice selectedDevice);
+
+        UsbEndpoint getEndPoint(UsbInterface usbInterface);
+    }
+
+    public interface ConnectionListener {
         void onReceiveMessage(int msg);
     }
 }
