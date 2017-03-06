@@ -56,7 +56,6 @@ public class UsbConnector {
     private UsbBroadCastReceiver mUsbBroadCastReceiver;
 
     private UsbInterface mUsbInterface;
-    private UsbEndpoint mUsbEndPoint;
     private UsbDeviceConnection mUsbDeviceConnection;
 
     public UsbConnector(Context context) {
@@ -138,7 +137,6 @@ public class UsbConnector {
     private void openCommunication() {
         if (mGrantedDevice != null) {
             mUsbInterface = mDeviceAdapter.getInterface(mGrantedDevice);
-            mUsbEndPoint = mDeviceAdapter.getEndPoint(mUsbInterface);
             mUsbDeviceConnection = mUsbManager.openDevice(mGrantedDevice);
             boolean hasSucceeded = mUsbDeviceConnection.claimInterface(mUsbInterface, forceClaim);
             if (hasSucceeded)
@@ -171,10 +169,10 @@ public class UsbConnector {
             return mUsbDeviceConnection.controlTransfer(requestType, request, value, index, buffer, length, timeout);
     }
 
-    public int bulkTransfer(byte[] buffer, int length, int timeout) {
+    public int bulkTransfer(UsbEndpoint endpoint, byte[] buffer, int length, int timeout) {
         if (mUsbDeviceConnection == null) return -1;
         else
-            return mUsbDeviceConnection.bulkTransfer(mUsbEndPoint, buffer, length, timeout);
+            return mUsbDeviceConnection.bulkTransfer(endpoint, buffer, length, timeout);
     }
 
     private void closeCommunication() {
@@ -184,7 +182,6 @@ public class UsbConnector {
             mUsbDeviceConnection.close();
         }
         mUsbInterface = null;
-        mUsbEndPoint = null;
         mUsbDeviceConnection = null;
     }
 
@@ -266,11 +263,6 @@ public class UsbConnector {
         public UsbInterface getInterface(UsbDevice selectedDevice) {
             return selectedDevice.getInterface(0);
         }
-
-        @Override
-        public UsbEndpoint getEndPoint(UsbInterface usbInterface) {
-            return usbInterface.getEndpoint(0);
-        }
     }
 
     public interface DeviceAdapter {
@@ -279,8 +271,6 @@ public class UsbConnector {
         UsbDevice selectDevice(ArrayList<UsbDevice> identifiedDevices);
 
         UsbInterface getInterface(UsbDevice selectedDevice);
-
-        UsbEndpoint getEndPoint(UsbInterface usbInterface);
     }
 
     public interface ConnectionListener {
