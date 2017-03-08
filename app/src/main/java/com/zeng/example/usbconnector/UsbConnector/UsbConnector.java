@@ -224,6 +224,7 @@ public class UsbConnector {
                 mConnectionListener.onReceiveMessage(MSG_DEVICE_ATTACHED);
                 // when there is a device attached, scan all devices and update identified-device list.
                 scan();
+                connect();
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED.equals(action)) {
                 if (device != null && device == mGrantedDevice)
                     disconnect();
