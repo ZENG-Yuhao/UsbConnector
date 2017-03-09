@@ -150,7 +150,7 @@ public class UsbConnector {
      * {@link UsbDeviceConnection} from being revealed to outside of this class.
      * <p/>
      * Tips: <br>
-     * You can use simply <b>0x40 (0b0100 0000)</b> as requestType for sending data and <b>0xC0 (0b1100 0000)</b> for
+     * You can use simply <b>0x21 (0b0010 0001)</b> as requestType for sending data and <b>0xA1 (0b1010 0001)</b> for
      * receiving data. <br>
      * <br>
      * requestType: <br>
