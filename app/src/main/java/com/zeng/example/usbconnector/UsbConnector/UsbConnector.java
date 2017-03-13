@@ -25,6 +25,16 @@ import java.util.Iterator;
  * <li> 4) Building connection and communication with the usb device. </li>
  * <li> 5) Handling disconnection and recycling of resources. </li>
  * </ul>
+ * Usage: <br>
+ * <ul  style="list-style-type:none">
+ * <li> 1) Create new instance of {@link UsbConnector}.</li>
+ * <li> 2) Set a {@link DeviceAdapter} via {@link #setDeviceAdapter(DeviceAdapter)}, {@link SimpleDeviceAdapter} will
+ * be applied if no custom adapter specified.</li>
+ * <li> 3) (Optional) Add a listener via {@link #setUsbConnectionListener(ConnectionListener)}.</li>
+ * <li> 4) Call {@link #scan()} for searching connected devices and call {@link #connect()} to connect the
+ * appropriate device selected by {@link DeviceAdapter}.</li>
+ * <li> 5) Call {@link #destroy()} to recycle resources when you need this connection no more.</li>
+ * </ul>
  * <p>
  * Created by ZENG Yuhao. <br>
  * Contact: enzo.zyh@gmail.com
